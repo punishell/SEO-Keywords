@@ -129,23 +129,40 @@ Each should be an array of strings."""
         return {}
 
 def extract_keywords_from_tweets(tweets, claude_analysis):
-    """Extract unique keywords from tweets and Claude analysis"""
-    keywords = set()
+    """Extract unique keywords from tweets and Claude analysis
+    
+    Prioritizes specific multi-word phrases from Claude's analysis over generic terms
+    """
+    keywords = []
     
     # Add hashtags from tweets
     for tweet in tweets:
         hashtags = tweet.get("hashtags", [])
-        keywords.update(h.lower() for h in hashtags if h)
+        keywords.extend(h.lower() for h in hashtags if h and len(h) > 2)
     
-    # Add keywords from Claude's analysis
+    # Prioritize Claude's analysis (topics, trends, keywords, technologies)
     if claude_analysis:
-        keywords.update(k.lower() for k in claude_analysis.get("keywords", []))
-        keywords.update(t.lower() for t in claude_analysis.get("topics", []))
-        keywords.update(tech.lower() for tech in claude_analysis.get("technologies", []))
+        # Topics are usually the most specific and relevant
+        keywords.extend(t.lower() for t in claude_analysis.get("topics", []))
+        
+        # Add emerging trends (also very relevant)
+        keywords.extend(trend.lower() for trend in claude_analysis.get("trends", []))
+        
+        # Add recommended keywords
+        keywords.extend(k.lower() for k in claude_analysis.get("keywords", []))
+        
+        # Add technologies mentioned
+        keywords.extend(tech.lower() for tech in claude_analysis.get("technologies", []))
     
-    # Filter and clean
-    keywords = [k for k in keywords if len(k) > 2 and len(k) < 50]
-    return list(keywords)[:20]  # Limit to top 20 to avoid API costs
+    # Remove duplicates while preserving order, filter by length
+    seen = set()
+    unique_keywords = []
+    for k in keywords:
+        if k not in seen and 3 <= len(k) <= 100:  # Allow longer phrases
+            seen.add(k)
+            unique_keywords.append(k)
+    
+    return unique_keywords[:20]  # Limit to top 20 to avoid API costs
 
 def analyze_keywords_with_dataforseo(keywords):
     """Get Google search metrics for keywords using DataForSEO"""
@@ -172,14 +189,13 @@ def analyze_keywords_with_dataforseo(keywords):
     post_data = [{
         "keywords": keywords,
         "location_name": "United States",
-        "language_name": "English",
-        "depth": 2,
-        "include_serp_info": True
+        "language_name": "English"
     }]
     
     try:
+        # Use keywords_for_keywords endpoint for exact matches instead of ideas
         response = requests.post(
-            "https://api.dataforseo.com/v3/dataforseo_labs/keyword_ideas/live",
+            "https://api.dataforseo.com/v3/keywords_data/google/search_volume/live",
             headers=headers,
             json=post_data,
             timeout=60
@@ -193,15 +209,20 @@ def analyze_keywords_with_dataforseo(keywords):
             for task in result["tasks"]:
                 if task.get("result"):
                     for item in task["result"]:
-                        if item.get("items"):
-                            for kw in item["items"][:30]:  # Top 30 keywords
-                                keyword_data.append({
-                                    "keyword": kw.get("keyword"),
-                                    "search_volume": kw.get("keyword_info", {}).get("search_volume"),
-                                    "competition": kw.get("keyword_info", {}).get("competition"),
-                                    "cpc": kw.get("keyword_info", {}).get("cpc"),
-                                    "difficulty": kw.get("keyword_properties", {}).get("keyword_difficulty"),
-                                })
+                        # Get exact keyword data (not expanded suggestions)
+                        kw_text = item.get("keyword")
+                        search_volume = item.get("search_volume")
+                        competition = item.get("competition")
+                        
+                        # Only include keywords with meaningful search volume
+                        if search_volume and search_volume >= 10:
+                            keyword_data.append({
+                                "keyword": kw_text,
+                                "search_volume": search_volume,
+                                "competition": competition,
+                                "cpc": item.get("cpc"),
+                                "difficulty": None,  # Not available in this endpoint
+                            })
         
         # Sort by search volume
         keyword_data.sort(key=lambda x: x.get("search_volume", 0) or 0, reverse=True)
