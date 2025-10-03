@@ -27,8 +27,26 @@ chmod +x main.py
 ## Usage
 
 ```bash
+# Basic usage (defaults: keyword="AI", likes=100)
 python3 main.py
+
+# Custom keyword
+python3 main.py --keyword "machine learning"
+
+# Custom minimum likes
+python3 main.py --likes 50
+
+# Combine both
+python3 main.py --keyword "ChatGPT" --likes 200
+
+# Show help
+python3 main.py --help
 ```
+
+### Command-line Arguments
+
+- `--keyword` - Search keyword or term (default: "AI")
+- `--likes` - Minimum number of likes required (default: 100)
 
 ## What it does
 

@@ -8,6 +8,7 @@ import base64
 from datetime import datetime
 import sys
 import os
+import argparse
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -22,9 +23,14 @@ CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
 DATAFORSEO_LOGIN = os.getenv("DATAFORSEO_LOGIN")
 DATAFORSEO_PASSWORD = os.getenv("DATAFORSEO_PASSWORD")
 
-def fetch_trending_tweets():
-    """Fetch trending AI-related tweets"""
-    print("📱 Fetching trending AI tweets...")
+def fetch_trending_tweets(keyword="AI", min_likes=100):
+    """Fetch trending tweets based on keyword and minimum likes
+    
+    Args:
+        keyword: Search keyword/term (default: "AI")
+        min_likes: Minimum number of likes required (default: 100)
+    """
+    print(f"📱 Fetching trending tweets for '{keyword}' with {min_likes}+ likes...")
     
     url = "https://api.twitterapi.io/twitter/tweet/advanced_search"
     headers = {
@@ -33,7 +39,7 @@ def fetch_trending_tweets():
         "Accept": "application/json"
     }
     params = {
-        "query": '(AI) min_faves:100 filter:media',
+        "query": f'({keyword}) min_faves:{min_likes} filter:media',
         "max_results": "10"
     }
     
@@ -326,13 +332,34 @@ def print_tweet_details(tweets):
         print("-" * 80)
 
 def main():
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description='Fetch trending tweets and analyze with Claude + DataForSEO',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        '--keyword',
+        type=str,
+        default='AI',
+        help='Search keyword or term to find tweets about'
+    )
+    parser.add_argument(
+        '--likes',
+        type=int,
+        default=100,
+        help='Minimum number of likes required for tweets'
+    )
+    
+    args = parser.parse_args()
+    
     print("=" * 60)
     print("🚀 AI Trends Analyzer with SEO Keywords")
     print("=" * 60)
+    print(f"🔍 Keyword: '{args.keyword}' | Min Likes: {args.likes}")
     print()
     
     # Step 1: Fetch tweets
-    tweets = fetch_trending_tweets()
+    tweets = fetch_trending_tweets(keyword=args.keyword, min_likes=args.likes)
     if not tweets:
         print("❌ No tweets fetched. Exiting.")
         sys.exit(1)
